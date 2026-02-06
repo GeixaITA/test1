@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Per Te - Il Nostro Tempo</title>
+    <style>
+        /* RESET E BASE */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff;
+        }
+
+        /* SFONDO STELLATO GLOBALE */
+        #starfield {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* SEZIONE 1: DEDICA (Intro) */
+        #intro-view {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #intro-canvas {
+            display: block;
+        }
+
+        #valentinesButton {
+            display: none;
+            position: absolute;
+            top: 80%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #ffb3c1;
+            color: #c9184a;
+            border: 2px solid #ff4d6d;
+            padding: 15px 35px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(255, 179, 193, 0.4);
+            transition: all 0.3s ease;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        #valentinesButton:hover {
+            background: #ff4d6d;
+            color: white;
+            box-shadow: 0 0 30px rgba(255, 77, 109, 0.6);
+        }
+
+        #skipButton {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 182, 193, 0.1);
+            color: rgba(255, 255, 255, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 15px;
+            font-size: 11px;
+            border-radius: 20px;
+            cursor: pointer;
+            z-index: 20;
+        }
+
+        /* SEZIONE 2: CUORE E CRONOMETRO */
+        #clock-view {
+            display: none; /* Inizialmente nascosto */
+            position: relative;
+            z-index: 3;
+            width: 100%;
+            height: 100%;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #heartWrapper {
+            position: relative;
+            width: 100vw;
+            height: 100vw;
+            max-width: 550px;
+            max-height: 550px;
+        }
+
+        #garden {
+            width: 100%;
+            height: 100%;
+        }
+
+        #elapseClock {
+            position: absolute;
+            top: 46%; /* Centratura PC */
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 100%;
+            pointer-events: none;
+            z-index: 10;
+            text-shadow: 0 0 20px rgba(0,0,0,1), 0 0 10px rgba(0,0,0,1);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        .days {
+            font-size: 2.5rem;
+            color: #ff4d6d;
+            font-weight: bold;
+        }
+
+        .time-box {
+            font-size: 1.1rem;
+            color: #eee;
+            letter-spacing: 2px;
+        }
+
+        #backBtn {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ccc;
+            padding: 8px 12px;
+            border-radius: 20px;
+            text-decoration: none;
+            font-size: 12px;
+            z-index: 100;
+        }
+
+        /* MOBILE OPTIMIZATION */
+        @media (max-width: 600px) {
+            #elapseClock {
+                top: 50%;
+            }
+            .days { font-size: 1.8rem; }
+            .time-box {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                font-size: 0.9rem;
+            }
+            #valentinesButton { width: 80%; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- SFONDO -->
+    <canvas id="starfield"></canvas>
+
+    <!-- VISTA 1: DEDICA -->
+    <div id="intro-view">
+        <canvas id="intro-canvas"></canvas>
+        <button id="valentinesButton">Vai al cronometro </button>
+        <button id="skipButton">SALTA ANIMAZIONE</button>
+    </div>
+
+    <!-- VISTA 2: CRONOMETRO -->
+    <div id="clock-view">
+        <a href="#" id="backBtn" onclick="location.reload()">← Torna</a>
+        <div id="heartWrapper">
+            <canvas id="garden"></canvas>
+            <div id="elapseClock"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURAZIONE GLOBALE ---
+        const starCanvas = document.getElementById("starfield");
+        const starCtx = starCanvas.getContext("2d");
+        const introCanvas = document.getElementById("intro-canvas");
+        const introCtx = introCanvas.getContext("2d");
+        const gardenCanvas = document.getElementById("garden");
+        const gardenCtx = gardenCanvas.getContext("2d");
+
+        let width, height, stars = [];
+        let messageIndex = 0;
+        let currentOpacity = 0;
+        let fadeState = 'in';
+        let waitCounter = 0;
+        let garden;
+
+        const textRose = "rgba(255, 210, 220, ";
+
+        const messages = [
+            { text: "Amore, stavo pensando a una cosa...", duration: 150 },
+            { text: "L’universo esiste da circa 13,8 miliardi di anni e ci sono più stelle nel cielo che granelli di sabbia su tutte le spiagge della Terra.", duration: 380 },
+            { text: "In questo spazio infinito e in un tempo così lungo, la probabilità che noi due esistessimo nello stesso identico momento era già bassissima.", duration: 380 },
+            { text: "Se poi aggiungi che sulla Terra siamo 8 miliardi di persone, divise in migliaia di città e milioni di strade...", duration: 350 },
+            { text: "Beh, la probabilità statistica che ci incrociassimo proprio quel giorno, a quell’ora, è praticamente vicina allo zero.", duration: 380 },
+            { text: "Siamo un’anomalia statistica, un 'miracolo' logico tra trilioni di galassie e pianeti deserti.", duration: 350 },
+            { text: "È pazzesco: tra tutto quel vuoto, io sono finito esattamente nello stesso punto della mappa dove c’eri tu.", duration: 380 },
+            { text: "Ma la statistica più difficile non è incontrarsi, è restare.", duration: 250 },
+            { text: "Superare i 1000 giorni insieme alla nostra età, mentre tutto intorno corre veloce, non è da tutti.", duration: 350 },
+            { text: "I numeri dicono che siamo un’eccezione, un caso su un milione che ha funzionato davvero.", duration: 350 },
+            { text: "E dopo questi 3 anni, la verità è che non mi interessa quanto fosse bassa la probabilità di trovarti...", duration: 350 },
+            { text: "Mi interessa solo che è successo.", duration: 250 },
+            { text: "Ti amo più di quanto l’universo possa contenere.\nBuon anniversario a noi ❤️‍🩹", duration: 999999 }
+        ];
+
+        // --- LOGICA STELLE ---
+        function initStars() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            starCanvas.width = width;
+            starCanvas.height = height;
+            introCanvas.width = width;
+            introCanvas.height = height;
+            stars = [];
+            for (let i = 0; i < 400; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    radius: Math.random() * 1.1,
+                    opacity: Math.random(),
+                    blink: Math.random() * 0.015
+                });
+            }
+        }
+
+        function drawStarfield() {
+            starCtx.fillStyle = "#000";
+            starCtx.fillRect(0, 0, width, height);
+            stars.forEach(s => {
+                starCtx.globalAlpha = s.opacity;
+                starCtx.beginPath();
+                starCtx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+                starCtx.fillStyle = "#fff";
+                starCtx.fill();
+                s.opacity += s.blink;
+                if (s.opacity > 1 || s.opacity < 0) s.blink = -s.blink;
+            });
+            starCtx.globalAlpha = 1;
+            requestAnimationFrame(drawStarfield);
+        }
+
+        // --- LOGICA INTRO TESTO ---
+        function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+            const sections = text.split('\n');
+            let allLines = [];
+            sections.forEach(section => {
+                const words = section.split(' ');
+                let line = '';
+                for (let n = 0; n < words.length; n++) {
+                    let testLine = line + words[n] + ' ';
+                    if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+                        allLines.push(line);
+                        line = words[n] + ' ';
+                    } else { line = testLine; }
+                }
+                allLines.push(line);
+            });
+            const startY = y - ((allLines.length * lineHeight) / 2);
+            allLines.forEach((l, i) => { ctx.fillText(l, x, startY + (i * lineHeight)); });
+        }
+
+        function drawIntro() {
+            if (document.getElementById("intro-view").style.display === "none") return;
+            introCtx.clearRect(0, 0, width, height);
+            let fontSize = width < 600 ? 19 : 26;
+            introCtx.font = `500 ${fontSize}px 'Segoe UI', sans-serif`;
+            introCtx.textAlign = "center";
+            introCtx.shadowColor = "rgba(255, 77, 109, 0.6)";
+            introCtx.shadowBlur = 12;
+
+            const msg = messages[messageIndex];
+            if (fadeState === 'in') {
+                currentOpacity += 0.01;
+                if (currentOpacity >= 1) { currentOpacity = 1; fadeState = 'wait'; 
+                    if (messageIndex === messages.length - 1) {
+                        document.getElementById("valentinesButton").style.display = "block";
+                        document.getElementById("skipButton").style.display = "none";
+                    }
+                }
+            } else if (fadeState === 'wait') {
+                waitCounter++;
+                if (waitCounter >= msg.duration && messageIndex < messages.length - 1) fadeState = 'out';
+            } else if (fadeState === 'out') {
+                currentOpacity -= 0.015;
+                if (currentOpacity <= 0) { currentOpacity = 0; messageIndex++; waitCounter = 0; fadeState = 'in'; }
+            }
+
+            introCtx.fillStyle = textRose + currentOpacity + ")";
+            wrapText(introCtx, msg.text, width/2, height/2, width*0.85, fontSize + 15);
+            requestAnimationFrame(drawIntro);
+        }
+
+        // --- LOGICA CUORE (GARDEN) ---
+        function Vector(x, y) { this.x = x; this.y = y; }
+        Vector.prototype = {
+            rotate: function (theta) {
+                var x = this.x, y = this.y;
+                this.x = Math.cos(theta) * x - Math.sin(theta) * y;
+                this.y = Math.sin(theta) * x + Math.cos(theta) * y;
+                return this;
+            },
+            mult: function (f) { this.x *= f; this.y *= f; return this; },
+            clone: function () { return new Vector(this.x, this.y); }
+        };
+        function Petal(stretchA, stretchB, startAngle, angle, growFactor, bloom) {
+            this.stretchA = stretchA; this.stretchB = stretchB; this.startAngle = startAngle;
+            this.angle = angle; this.bloom = bloom; this.growFactor = growFactor; this.r = 1;
+        }
+        Petal.prototype.render = function () {
+            var ctx = this.bloom.garden.ctx;
+            var v1 = new Vector(0, this.r).rotate(this.startAngle * Math.PI / 180);
+            var v2 = v1.clone().rotate(this.angle * Math.PI / 180);
+            var v3 = v1.clone().mult(this.stretchA);
+            var v4 = v2.clone().mult(this.stretchB);
+            ctx.strokeStyle = this.bloom.c; ctx.beginPath(); ctx.moveTo(v1.x, v1.y);
+            ctx.bezierCurveTo(v3.x, v3.y, v4.x, v4.y, v2.x, v2.y); ctx.stroke();
+        };
+        function Bloom(p, r, c, pc, garden) {
+            this.p = p; this.r = r; this.c = c; this.pc = pc; this.petals = []; this.garden = garden;
+            var angle = 360 / pc;
+            for (var i = 0; i < pc; i++) this.petals.push(new Petal(Math.random()*2+1, Math.random()*2+1, i*angle, angle, Math.random()*0.8+0.2, this));
+        }
+        Bloom.prototype.draw = function () {
+            this.garden.ctx.save(); this.garden.ctx.translate(this.p.x, this.p.y);
+            for (var i = 0; i < this.petals.length; i++) {
+                var p = this.petals[i]; if (p.r < this.r) p.r += p.growFactor; p.render();
+            }
+            this.garden.ctx.restore();
+        };
+        function Garden(ctx, element) { this.blooms = []; this.ctx = ctx; this.element = element; }
+        Garden.prototype.render = function () { for (var i = 0; i < this.blooms.length; i++) this.blooms[i].draw(); };
+
+        function initGarden() {
+            const size = Math.min(window.innerWidth * 0.9, 550);
+            gardenCanvas.width = size; gardenCanvas.height = size;
+            gardenCtx.globalCompositeOperation = "lighter";
+            garden = new Garden(gardenCtx, gardenCanvas);
+            let offsetX = size / 2, offsetY = size / 2 - (size * 0.08), angle = 10, heartScale = size / 38;
+            setInterval(() => { garden.render(); }, 35);
+            let timer = setInterval(() => {
+                let t = angle / Math.PI;
+                let x = 16 * Math.pow(Math.sin(t), 3) * heartScale;
+                let y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * heartScale;
+                garden.blooms.push(new Bloom(new Vector(offsetX + x, offsetY + y), size / 45, `rgba(255, ${Math.random()*100+100}, ${Math.random()*100+150}, 0.25)`, 8, garden));
+                if (angle >= 30) clearInterval(timer);
+                angle += 0.18;
+            }, 50);
+        }
+
+        // --- CRONOMETRO ---
+        function updateClock() {
+            const start = new Date(2023, 1, 11, 0, 0, 0); 
+            const now = new Date();
+            const diff = now - start;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+            const mins = Math.floor((diff / (1000 * 60)) % 60);
+            const secs = Math.floor((diff / 1000) % 60);
+            document.getElementById("elapseClock").innerHTML = 
+                `<div class="days">${days} GIORNI</div>` +
+                `<div class="time-box"><span>${hours} ORE, ${mins} MIN, </span><span class="seconds-label">${secs} SEC</span></div>`;
+        }
+
+        // --- GESTIONE CAMBIO VISTA ---
+        document.getElementById("valentinesButton").addEventListener("click", () => {
+            document.getElementById("intro-view").style.display = "none";
+            document.getElementById("clock-view").style.display = "flex";
+            initGarden();
+            setInterval(updateClock, 1000);
+            updateClock();
+        });
+
+        document.getElementById("skipButton").addEventListener("click", () => {
+            messageIndex = messages.length - 1;
+            fadeState = 'in'; currentOpacity = 1; waitCounter = 0;
+            document.getElementById("valentinesButton").style.display = "block";
+            document.getElementById("skipButton").style.display = "none";
+        });
+
+        // AVVIO
+        window.onload = () => {
+            initStars();
+            drawStarfield();
+            drawIntro();
+        };
+        window.onresize = initStars;
+    </script>
+</body>
+</html>
